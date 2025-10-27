@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rendhagyó igék — 3 alak gyakorlás</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-sky-50 to-indigo-50 min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-3xl bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-8">
+    <header class="text-center mb-6">
+      <h1 class="text-3xl font-extrabold text-indigo-700">Rendhagyó igék — 3 alak (base / past / past participle)</h1>
+      <p class="text-sm text-gray-600 mt-2">A magyar jelentés jelenik meg — válaszd ki a helyes angol 3-alak párost.</p>
+    </header>
+
+    <main id="game" class="space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm text-gray-500">Kérdés</p>
+          <p id="prompt" class="text-2xl font-bold text-indigo-800">Betöltés...</p>
+        </div>
+        <div class="text-right">
+          <p id="counter" class="text-sm text-gray-500">0 / 10</p>
+          <div class="w-52 bg-gray-200 rounded-full h-3 mt-2 overflow-hidden">
+            <div id="progress" class="h-3 bg-indigo-500 rounded-full transition-all" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="options" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+
+      <div id="feedback" class="h-14 flex items-center justify-center text-2xl font-extrabold"></div>
+
+      <div class="flex justify-between items-center">
+        <div class="text-sm text-gray-600">Válassz az alábbi lehetőségek közül.</div>
+        <button id="restart" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-2xl hidden">Újrakezdés</button>
+      </div>
+    </main>
+
+    <section id="end" class="hidden mt-6 text-center space-y-4">
+      <h2 id="resultTitle" class="text-3xl font-extrabold text-indigo-700"></h2>
+      <p id="resultScore" class="text-lg text-gray-700"></p>
+      <button id="playAgain" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-6 rounded-2xl">Játszd újra</button>
+    </section>
+  </div>
+
+  <script>
+    // Verb list: magyar: base, past, past participle
+    const verbs = [
+      { hu: "érez", base: "feel", past: "felt", pp: "felt" },
+      { hu: "harcol", base: "fight", past: "fought", pp: "fought" },
+      { hu: "talál", base: "find", past: "found", pp: "found" },
+      { hu: "repül", base: "fly", past: "flew", pp: "flown" },
+      { hu: "kap", base: "get", past: "got", pp: "got" },
+      { hu: "ad", base: "give", past: "gave", pp: "given" },
+      { hu: "megy", base: "go", past: "went", pp: "gone" },
+      { hu: "nő, termeszt", base: "grow", past: "grew", pp: "grown" },
+      { hu: "birtokol valamit", base: "have", past: "had", pp: "had" },
+      { hu: "hall", base: "hear", past: "heard", pp: "heard" },
+      { hu: "elbújik", base: "hide", past: "hid", pp: "hidden" },
+      { hu: "üt", base: "hit", past: "hit", pp: "hit" },
+      { hu: "tart", base: "hold", past: "held", pp: "held" },
+      { hu: "fáj, bánt", base: "hurt", past: "hurt", pp: "hurt" },
+      { hu: "megtart", base: "keep", past: "kept", pp: "kept" },
+      { hu: "tud, ismer", base: "know", past: "knew", pp: "known" },
+      { hu: "tanul", base: "learn", past: "learnt", pp: "learnt" },
+      { hu: "elindul, elhagy", base: "leave", past: "left", pp: "left" },
+      { hu: "fekszik", base: "lie", past: "lay", pp: "lain" },
+      { hu: "elveszít", base: "lose", past: "lost", pp: "lost" }
+    ];
+
+    const TOTAL = 10;
+    let pool = [];
+    let currentIndex = 0;
+    let correctCount = 0;
+    let accepting = true;
+
+    // Utilities
+    function shuffle(a) {
+      return a.slice().sort(() => Math.random() - 0.5);
+    }
+
+    function pickWrongTriples(correctBase, count) {
+      const others = verbs.filter(v => v.base !== correctBase);
+      return shuffle(others).slice(0, count).map(v => ({ base: v.base, past: v.past, pp: v.pp }));
+    }
+
+    // UI elements
+    const promptEl = document.getElementById("prompt");
+    const optionsEl = document.getElementById("options");
+    const feedbackEl = document.getElementById("feedback");
+    const progressEl = document.getElementById("progress");
+    const counterEl = document.getElementById("counter");
+    const endEl = document.getElementById("end");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultScore = document.getElementById("resultScore");
+    const playAgainBtn = document.getElementById("playAgain");
+    const restartBtn = document.getElementById("restart");
+
+    function start() {
+      pool = shuffle(verbs).slice(0, TOTAL);
+      currentIndex = 0;
+      correctCount = 0;
+      accepting = true;
+      endEl.classList.add("hidden");
+      document.getElementById("game").classList.remove("opacity-40");
+      restartBtn.classList.add("hidden");
+      render();
+    }
+
+    function render() {
+      accepting = true;
+      optionsEl.innerHTML = "";
+      feedbackEl.textContent = "";
+      const v = pool[currentIndex];
+      promptEl.textContent = `"${v.hu}" — melyik a helyes angol 3-alak?`;
+      counterEl.textContent = `${currentIndex + 1} / ${TOTAL}`;
+      progressEl.style.width = `${(currentIndex / TOTAL) * 100}%`;
+
+      // prepare options: correct triple + 3 wrong triples
+      const wrongs = pickWrongTriples(v.base, 3);
+      const opts = shuffle([{ base: v.base, past: v.past, pp: v.pp, correct: true }, 
+                            ...wrongs.map(w => ({ base: w.base, past: w.past, pp: w.pp, correct: false }))]);
+
+      opts.forEach(opt => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "w-full text-left bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 py-3 px-4 rounded-xl transition shadow-sm";
+        btn.innerHTML = `<span class="block text-lg font-semibold">${opt.base} — ${opt.past} — ${opt.pp}</span>`;
+        btn.onclick = () => handleAnswer(btn, opt.correct);
+        optionsEl.appendChild(btn);
+      });
+    }
+
+    function handleAnswer(button, isCorrect) {
+      if (!accepting) return;
+      accepting = false;
+      // disable all buttons
+      const btns = optionsEl.querySelectorAll("button");
+      btns.forEach(b => b.disabled = true);
+
+      if (isCorrect) {
+        correctCount++;
+        feedbackEl.textContent = "Hell yeah!";
+        feedbackEl.className = "h-14 flex items-center justify-center text-2xl font-extrabold text-green-600";
+        button.classList.add("bg-green-100", "border-green-300");
+      } else {
+        feedbackEl.textContent = "Hell nah!";
+        feedbackEl.className = "h-14 flex items-center justify-center text-2xl font-extrabold text-red-600";
+        button.classList.add("bg-red-100", "border-red-300");
+        // highlight correct option
+        const correctText = `${pool[currentIndex].base} — ${pool[currentIndex].past} — ${pool[currentIndex].pp}`;
+        btns.forEach(b => {
+          if (b.textContent.trim() === correctText) {
+            b.classList.add("bg-green-100", "border-green-300");
+          }
+        });
+      }
+
+      // short delay then next or finish
+      setTimeout(() => {
+        currentIndex++;
+        if (currentIndex >= TOTAL) finish();
+        else render();
+      }, 900);
+    }
+
+    function finish() {
+      document.getElementById("game").classList.add("opacity-40");
+      endEl.classList.remove("hidden");
+      restartBtn.classList.remove("hidden");
+      progressEl.style.width = "100%";
+      resultScore.textContent = `Pontszám: ${correctCount} / ${TOTAL}`;
+
+      if (correctCount === 10) resultTitle.textContent = "Excellent!";
+      else if (correctCount >= 7) resultTitle.textContent = "Satisfactory!";
+      else resultTitle.textContent = "Unsatisfactory! Try again!";
+    }
+
+    playAgainBtn.addEventListener("click", () => start());
+    restartBtn.addEventListener("click", () => start());
+
+    // init
+    start();
+  </script>
+</body>
+</html>
